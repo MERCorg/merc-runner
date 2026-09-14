@@ -1,0 +1,12 @@
+{
+    "schema_version": 2,
+    "inputs": {
+        "spec": "s3://merc-cloud-jobs/job-1/input/abp.mcrl2"
+    },
+    "steps": [
+        ["mcrl22lps", "-v", "$spec", "$out.model.lps"],
+        ["merc-lps", "explore-explicit", "$model.lps", "--strategy", "bfs", "--output", "$out.model.lts"],
+        ["merc-lts", "reduce", "branching-bisim", "$model.lts", "--output", "$out.model.reduced.lts"]
+    ],
+    "keep": ["$model.reduced.lts"]
+}
