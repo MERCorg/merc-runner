@@ -1,7 +1,7 @@
 {
     "schema_version": 2,
     "inputs": {
-        "spec": "s3://merc-cloud-jobs/job-1/input/abp.mcrl2"
+        "spec": "abp.mcrl2"
     },
     "steps": [
         ["mcrl22lps", "-v", "$spec", "$out.model.lps"],

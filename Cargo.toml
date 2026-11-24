@@ -1,11 +1,14 @@
 [workspace]
 resolver = "3"
-members = ["crates/core", "tools/cloud", "tools/job"]
+members = ["crates/core", "tools/submit", "tools/job"]
 
 [workspace.dependencies]
-aws-config = { version = "1.12", features = ["credentials-login"] }
+aws-config = { version = "1.13", features = ["credentials-login"] }
+duct = "1.1"
 clap = { version = "4.6", features = ["derive"] }
-tokio = { version = "1.53", features = ["macros", "rt-multi-thread"] }
+tokio = { version = "1.54", features = ["macros", "rt-multi-thread"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
+
+merc-core = { path = "crates/core" }
