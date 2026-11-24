@@ -21,7 +21,7 @@ fn resolves_the_abp_pipeline_end_to_end() {
 
     let lps = &plan.steps[0];
     assert_eq!(lps.tool, Tool::Mcrl22Lps);
-    assert_eq!(lps.args, vec!["-v", "s3://merc-cloud-jobs/job-1/input/abp.mcrl2", "model.lps"]);
+    assert_eq!(lps.args, vec!["-v", "abp.mcrl2", "model.lps"]);
     assert_eq!(lps.outputs, vec!["model.lps"]);
 
     let explore = &plan.steps[1];
@@ -124,4 +124,20 @@ fn rejects_empty_pipeline() {
     let json = r#"{ "schema_version": 2, "inputs": {}, "steps": [] }"#;
     let spec = JobSpec::from_json(json).expect("valid spec");
     assert!(matches!(resolve(&spec), Err(JobSpecError::EmptyPipeline)));
+}
+
+#[test]
+fn records_which_earlier_steps_a_step_depends_on() {
+    let spec = spec_with_steps(
+        r#"[
+            ["merc-lts", "$spec", "$out.a.lts"],
+            ["merc-lts", "$spec", "$out.b.lts"],
+            ["merc-lts", "$b.lts", "$a.lts", "$b.lts", "$out.c.lts"],
+            ["merc-lts", "$a.lts", "$out.d.lts"]
+        ]"#,
+    );
+    let plan = resolve(&spec).expect("valid pipeline");
+
+    let depends_on: Vec<_> = plan.steps.iter().map(|step| step.depends_on.clone()).collect();
+    assert_eq!(depends_on, vec![vec![], vec![], vec![0, 1], vec![0]]);
 }

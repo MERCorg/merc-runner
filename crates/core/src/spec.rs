@@ -50,6 +50,16 @@ impl JobSpec {
     }
 }
 
+/// The toolset a [`Tool`] belongs to, which determines where its binary is
+/// installed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Toolset {
+    /// The mCRL2 toolset (`mcrl22lps`, `lps2pbes`, ...).
+    Mcrl2,
+    /// The merc toolset (`merc-lps`, `merc-lts`, ...).
+    Merc,
+}
+
 /// The allow-listed set of binaries the runner may execute.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum Tool {
@@ -91,6 +101,14 @@ impl Tool {
             Tool::MercPbes => "merc-pbes",
             Tool::MercVpg => "merc-vpg",
             Tool::MercRewrite => "merc-rewrite",
+        }
+    }
+
+    /// The toolset this tool is part of.
+    pub fn toolset(self) -> Toolset {
+        match self {
+            Tool::Mcrl22Lps | Tool::Lps2Pbes => Toolset::Mcrl2,
+            Tool::MercLps | Tool::MercLts | Tool::MercPbes | Tool::MercVpg | Tool::MercRewrite => Toolset::Merc,
         }
     }
 
