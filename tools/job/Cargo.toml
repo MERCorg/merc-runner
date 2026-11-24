@@ -1,0 +1,11 @@
+[package]
+name = "merc-job"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+clap.workspace = true
+duct.workspace = true
+thiserror.workspace = true
+
+merc-core.workspace = true
