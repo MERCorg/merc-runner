@@ -1,0 +1,8 @@
+[package]
+name = "merc-submit"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+aws-config.workspace = true
+tokio.workspace = true
