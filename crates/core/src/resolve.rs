@@ -19,6 +19,11 @@ pub struct ResolvedStep {
     /// The files this step declares as outputs, relative to the working
     /// directory.
     pub outputs: Vec<String>,
+
+    /// The (0-based) indices of the earlier steps whose outputs this step
+    /// references, in increasing order. The step can start as soon as all of
+    /// them have finished.
+    pub depends_on: Vec<usize>,
 }
 
 /// A job spec whose step order is a valid execution (and dependency) order,
@@ -97,10 +102,15 @@ fn name_len(s: &str) -> usize {
     s[..end].trim_end_matches('.').len()
 }
 
+/// Whether `name` is a full name, usable as an output.
+pub(crate) fn is_valid_name(name: &str) -> bool {
+    !name.is_empty() && name_len(name) == name.len()
+}
+
 /// Whether `name` is usable as an input name: a full name that does not
 /// collide with the reserved `$out.` declaration prefix.
-fn is_valid_input_name(name: &str) -> bool {
-    !name.is_empty() && name_len(name) == name.len() && name != "out" && !name.starts_with("out.")
+pub(crate) fn is_valid_input_name(name: &str) -> bool {
+    is_valid_name(name) && name != "out" && !name.starts_with("out.")
 }
 
 /// Validates `spec` and resolves every step's args.
@@ -130,10 +140,12 @@ pub fn resolve(spec: &JobSpec) -> Result<ResolvedPlan, JobSpecError> {
         names.insert(name, location);
     }
 
+    // The index of the step that produces each output.
+    let mut producers: HashMap<&str, usize> = HashMap::new();
     let mut outputs = HashSet::new();
     let mut steps = Vec::with_capacity(spec.steps.len());
     for (index, argv) in spec.steps.iter().enumerate() {
-        let (step, declared) = resolve_step(index + 1, argv, &names)?;
+        let (step, declared) = resolve_step(index + 1, argv, &names, &producers)?;
 
         // Only now do this step's outputs come into scope, so later steps
         // can reference them but the step itself cannot.
@@ -145,6 +157,7 @@ pub fn resolve(spec: &JobSpec) -> Result<ResolvedPlan, JobSpecError> {
                 });
             }
             outputs.insert(output);
+            producers.insert(output, index);
         }
 
         steps.push(step);
@@ -164,12 +177,20 @@ pub fn resolve(spec: &JobSpec) -> Result<ResolvedPlan, JobSpecError> {
 }
 
 /// Resolves the step with 1-based number `step` against the names declared
-/// before it. Also returns the names of the outputs the step declares.
-fn resolve_step<'a>(step: usize, argv: &'a [String], names: &HashMap<&str, &str>) -> Result<(ResolvedStep, Vec<&'a str>), JobSpecError> {
+/// before it, where `producers` maps every output among them to the index of
+/// the step that declares it. Also returns the names of the outputs the step
+/// declares.
+fn resolve_step<'a>(
+    step: usize,
+    argv: &'a [String],
+    names: &HashMap<&str, &str>,
+    producers: &HashMap<&str, usize>,
+) -> Result<(ResolvedStep, Vec<&'a str>), JobSpecError> {
     let (tool, args) = argv.split_first().ok_or(JobSpecError::EmptyStep { step })?;
     let tool = Tool::from_binary_name(tool).ok_or_else(|| JobSpecError::UnknownTool { step, tool: tool.clone() })?;
 
     let mut outputs: Vec<&'a str> = Vec::new();
+    let mut depends_on = Vec::new();
     let args = args
         .iter()
         .map(|arg| {
@@ -192,6 +213,9 @@ fn resolve_step<'a>(step: usize, argv: &'a [String], names: &HashMap<&str, &str>
                     Piece::Reference(name) => {
                         let value = names.get(name).ok_or_else(|| JobSpecError::UnknownName { step, name: name.to_string() })?;
                         resolved.push_str(value);
+                        if let Some(&producer) = producers.get(name) {
+                            depends_on.push(producer);
+                        }
                     }
                 }
             }
@@ -200,10 +224,14 @@ fn resolve_step<'a>(step: usize, argv: &'a [String], names: &HashMap<&str, &str>
         })
         .collect::<Result<Vec<_>, _>>()?;
 
+    depends_on.sort_unstable();
+    depends_on.dedup();
+
     let step = ResolvedStep {
         tool,
         args,
         outputs: outputs.iter().map(|o| o.to_string()).collect(),
+        depends_on,
     };
     Ok((step, outputs))
 }
